@@ -68,16 +68,18 @@ class Bot:
     def __init__(self, config: ConfigManager) -> None:
         self._cfg = config
 
-        # Load persona text
+        # Load persona text and replace {NAME} with bot_name
         persona_path = Path(config.bot.persona_file)
+        bot_name = getattr(config, "bot_name", config.bot.display_name)
         if persona_path.exists():
-            self._persona = persona_path.read_text(encoding="utf-8").strip()
+            persona_text = persona_path.read_text(encoding="utf-8").strip()
+            self._persona = persona_text.replace("{NAME}", bot_name)
         else:
             logger.warning(
                 "Persona file not found at %s — using built-in default.", persona_path
             )
             self._persona = (
-                "You are a witty, sarcastic bot living in a Matrix chat server. "
+                f"You are a witty, sarcastic bot named {bot_name} living in a Matrix chat server. "
                 "Keep responses short and punchy."
             )
 
@@ -143,15 +145,29 @@ class Bot:
         self._room_history[room_id].append((sender_name, text))
         self._messages_since_last_post[room_id] += 1
 
-        # Decide whether to respond
-        triggered = self._is_triggered(text)
-        should_respond = triggered or self._should_chime_in(room_id)
+        # Passive channel logic
+        passive_channels = set(self._cfg.matrix.passive_channels)
+        if room_id in passive_channels or room.canonical_alias in passive_channels:
+            # Use LLM to classify if bot is being addressed
+            score = await self._classify_addressed(text, sender_name)
+            logger.info(f"Passive channel: classified score={score:.2f} for message '{text}'")
+            if score >= self._cfg.bot.passive_reply_threshold_high:
+                should_respond = True
+            elif score < self._cfg.bot.passive_reply_threshold_low:
+                should_respond = False
+            else:
+                # Optionally: ask for clarification or wait
+                logger.info(f"Ambiguous address score in passive channel: {score:.2f}")
+                return
+        else:
+            triggered = self._is_triggered(text)
+            should_respond = triggered or self._should_chime_in(room_id)
 
         if not should_respond:
             return
 
         logger.info(
-            "Responding in %s to %s (triggered=%s)", room_id, sender_name, triggered
+            "Responding in %s to %s (triggered=%s)", room_id, sender_name, 'passive' if room_id in passive_channels else triggered
         )
 
         # Build prompt and generate reply (off the event loop to avoid blocking)
@@ -170,6 +186,27 @@ class Bot:
             return
 
         await self._matrix.send_message(room_id, reply)
+
+    async def _classify_addressed(self, text: str, sender_name: str) -> float:
+        """Use LLM to classify if the message is directed at the bot. Returns a score 0-1."""
+        # Simple prompt for classification
+        prompt = (
+            f"You are a helpful assistant. Given the following message, return a score from 0 to 1 "
+            f"indicating how likely it is that the message is directed at you (the bot).\n"
+            f"Message: '{text}'\n"
+            f"Sender: {sender_name}\n"
+            f"Score (0-1):"
+        )
+        # Use the LLM to generate a score (expecting a float in output)
+        result = await asyncio.get_event_loop().run_in_executor(
+            None, lambda: self._llm.generate(prompt, max_new_tokens=4)
+        )
+        try:
+            score = float(result.strip().split()[0])
+            return max(0.0, min(1.0, score))
+        except Exception:
+            logger.warning(f"Could not parse classification score from LLM output: {result}")
+            return 0.0
 
         # Update cooldown state
         self._last_bot_post_time[room_id] = time.monotonic()

@@ -27,6 +27,7 @@ import yaml
 
 
 @dataclass
+@dataclass
 class MatrixConfig:
     homeserver: str
     username: str
@@ -34,6 +35,7 @@ class MatrixConfig:
     device_name: str = "LLM-Bot"
     allowed_rooms: List[str] = field(default_factory=list)
     store_path: str = "data/matrix_store"
+    passive_channels: List[str] = field(default_factory=list)
 
 
 @dataclass
@@ -52,6 +54,7 @@ class LLMConfig:
 
 
 @dataclass
+@dataclass
 class BotConfig:
     display_name: str = "GPBot"
     trigger_names: List[str] = field(default_factory=lambda: ["gpbot"])
@@ -61,6 +64,8 @@ class BotConfig:
     chime_in_cooldown_seconds: int = 60
     conversation_history_limit: int = 12
     dossier_token_budget: int = 512
+    passive_reply_threshold_high: float = 0.7
+    passive_reply_threshold_low: float = 0.3
 
 
 @dataclass
@@ -145,6 +150,7 @@ class ConfigManager:
             device_name=d.get("device_name", "LLM-Bot"),
             allowed_rooms=d.get("allowed_rooms", []) or [],
             store_path=d.get("store_path", "data/matrix_store"),
+            passive_channels=d.get("passive_channels", []) or [],
         )
 
     @staticmethod
@@ -174,6 +180,8 @@ class ConfigManager:
             chime_in_cooldown_seconds=int(d.get("chime_in_cooldown_seconds", 60)),
             conversation_history_limit=int(d.get("conversation_history_limit", 12)),
             dossier_token_budget=int(d.get("dossier_token_budget", 512)),
+            passive_reply_threshold_high=float(d.get("passive_reply_threshold_high", 0.7)),
+            passive_reply_threshold_low=float(d.get("passive_reply_threshold_low", 0.3)),
         )
 
     @staticmethod
