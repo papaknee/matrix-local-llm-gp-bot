@@ -39,6 +39,12 @@ llm:
   # Example: "mistralai/Mistral-7B-Instruct-v0.2"
   hf_model_id: ""
 
+  # Local directory for HuggingFace model downloads (transformers backend only).
+  # Keeping this inside the repo directory means all large files stay in one
+  # place and are easy to find and delete when freeing up disk space.
+  # This folder is already excluded from git via .gitignore (models/).
+  hf_cache_dir: "models/hf_cache"
+
   # Hardware mode: "gpu" or "cpu"
   # "gpu" requires a CUDA-capable NVIDIA GPU (or Metal on Apple Silicon).
   # "cpu" works on any machine but is significantly slower.

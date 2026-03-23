@@ -41,6 +41,7 @@ class LLMConfig:
     backend: str = "llamacpp"           # "llamacpp" | "transformers"
     model_path: str = ""
     hf_model_id: str = ""
+    hf_cache_dir: str = "models/hf_cache"  # local cache for HuggingFace downloads
     hardware_mode: str = "cpu"          # "cpu" | "gpu"
     n_gpu_layers: int = 0
     context_length: int = 4096
@@ -152,6 +153,7 @@ class ConfigManager:
             backend=d.get("backend", "llamacpp"),
             model_path=d.get("model_path", ""),
             hf_model_id=d.get("hf_model_id", ""),
+            hf_cache_dir=d.get("hf_cache_dir", "models/hf_cache"),
             hardware_mode=d.get("hardware_mode", "cpu"),
             n_gpu_layers=int(d.get("n_gpu_layers", 0)),
             context_length=int(d.get("context_length", 4096)),
@@ -253,6 +255,7 @@ class ConfigManager:
             self.memory.dossier_dir,
             self.memory.archive_dir,
             self.matrix.store_path,
+            self.llm.hf_cache_dir if self.llm.backend == "transformers" else None,
             os.path.dirname(self.logging.file) if self.logging.file else None,
         ]
         for d in dirs:
