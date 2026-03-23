@@ -1,0 +1,153 @@
+# ============================================================
+#  matrix-local-llm-gp-bot  —  Example Configuration File
+# ============================================================
+# Copy this file to config/config.yaml and fill in your details.
+# Lines starting with "#" are comments and are ignored.
+
+# ──────────────────────────────────────────────────────────────
+# MATRIX SERVER SETTINGS
+# ──────────────────────────────────────────────────────────────
+matrix:
+  homeserver: "https://matrix.example.org"   # Your Matrix homeserver URL
+  username: "@mybot:matrix.example.org"       # Full Matrix user ID of the bot account
+  password: "supersecretpassword"             # Bot account password
+  device_name: "LLM-Bot"                     # Name shown in session list
+
+  # Rooms the bot is allowed to listen in and post to.
+  # Use room aliases (e.g. #general:example.org) or room IDs (!abc123:example.org).
+  # Leave empty ([]) to allow ALL rooms the bot is invited to.
+  allowed_rooms:
+    - "#general:matrix.example.org"
+    - "#random:matrix.example.org"
+
+  # How long to keep read receipts / sync state on disk (seconds).
+  # Increase for faster reconnect after downtime.
+  store_path: "data/matrix_store"
+
+# ──────────────────────────────────────────────────────────────
+# LLM / MODEL SETTINGS
+# ──────────────────────────────────────────────────────────────
+llm:
+  # Backend to use: "llamacpp" or "transformers"
+  backend: "llamacpp"
+
+  # Path to your downloaded GGUF model file (used with llamacpp backend).
+  # Example: "models/mistral-7b-instruct-v0.2.Q4_K_M.gguf"
+  model_path: "models/mistral-7b-instruct-v0.2.Q4_K_M.gguf"
+
+  # HuggingFace model ID (used with transformers backend).
+  # Example: "mistralai/Mistral-7B-Instruct-v0.2"
+  hf_model_id: ""
+
+  # Hardware mode: "gpu" or "cpu"
+  # "gpu" requires a CUDA-capable NVIDIA GPU (or Metal on Apple Silicon).
+  # "cpu" works on any machine but is significantly slower.
+  hardware_mode: "cpu"
+
+  # Number of GPU layers to offload (llamacpp only, ignored for cpu mode).
+  # Set to -1 to offload all layers (maximise GPU use).
+  # Start with 20 and increase until you hit VRAM limits.
+  n_gpu_layers: 0
+
+  # Context window size in tokens.  Larger = more memory but richer context.
+  # Most 7B models support 4096; some fine-tunes support 8192 or more.
+  context_length: 4096
+
+  # Maximum tokens the model may generate per reply.
+  max_new_tokens: 512
+
+  # Sampling temperature (overridden at runtime by the temperature controller).
+  # 0.1 = very focused / robotic.  1.2 = creative / unpredictable.
+  temperature: 0.7
+
+  # Top-p (nucleus) sampling.  0.9 is a safe default.
+  top_p: 0.9
+
+  # Repeat penalty – reduces repetitive output.  1.1 is a safe default.
+  repeat_penalty: 1.1
+
+# ──────────────────────────────────────────────────────────────
+# BOT PERSONALITY & BEHAVIOUR
+# ──────────────────────────────────────────────────────────────
+bot:
+  # Display name shown in Matrix rooms.
+  display_name: "GPBot"
+
+  # The bot will always respond when these strings appear in a message
+  # (case-insensitive).  Include the bot's Matrix localpart and any nicknames.
+  trigger_names:
+    - "gpbot"
+    - "gp"
+    - "hey bot"
+    - "yo bot"
+
+  # Path to the file containing the bot's system/persona instructions.
+  persona_file: "config/bot_persona.txt"
+
+  # Probability (0.0 – 1.0) that the bot spontaneously joins a conversation
+  # even when NOT directly addressed.  0.0 = never butts in.  1.0 = always.
+  chime_in_probability: 0.08
+
+  # Minimum number of messages in a room since the last bot post before the
+  # bot considers chiming in again (prevents flooding).
+  chime_in_cooldown_messages: 5
+
+  # Minimum seconds between any two bot posts in the same room.
+  chime_in_cooldown_seconds: 60
+
+  # How many recent room messages to include in the LLM prompt as context.
+  conversation_history_limit: 12
+
+  # Maximum tokens reserved for user dossier context in the prompt.
+  # If the dossier exceeds this, it is automatically summarised first.
+  dossier_token_budget: 512
+
+# ──────────────────────────────────────────────────────────────
+# TEMPERATURE / MOOD CONTROLLER
+# ──────────────────────────────────────────────────────────────
+temperature_controller:
+  # Enable scheduled mood swings.
+  enabled: true
+
+  # How often (in minutes) the bot randomly picks a new temperature.
+  change_interval_minutes: 30
+
+  # The temperature is chosen uniformly at random within [min, max].
+  min_temperature: 0.3   # calm / focused
+  max_temperature: 1.15  # chaotic / feisty
+
+  # Optional: also randomly adjust chime_in_probability on each mood change.
+  randomise_chime_in: true
+  min_chime_in: 0.02
+  max_chime_in: 0.20
+
+# ──────────────────────────────────────────────────────────────
+# MEMORY / DOSSIER SETTINGS
+# ──────────────────────────────────────────────────────────────
+memory:
+  # Directory where per-user dossier JSON files are stored.
+  dossier_dir: "data/dossiers"
+
+  # Directory for archived (older) memory snapshots.
+  archive_dir: "data/archives"
+
+  # Maximum number of interaction entries to keep in an active dossier
+  # before older entries are compacted into a summary.
+  max_active_entries: 50
+
+  # How often (in hours) to run the compaction job.
+  compaction_interval_hours: 6
+
+  # Maximum character length of the compacted summary stored per user.
+  # Keeps the dossier from ballooning the LLM prompt.
+  max_summary_chars: 800
+
+# ──────────────────────────────────────────────────────────────
+# LOGGING
+# ──────────────────────────────────────────────────────────────
+logging:
+  # Log level: DEBUG | INFO | WARNING | ERROR
+  level: "INFO"
+
+  # Optional log file path.  Leave empty to log to console only.
+  file: "data/bot.log"
