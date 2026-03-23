@@ -141,7 +141,9 @@ matrix-local-llm-gp-bot/
 │   ├── dossiers/              ← Per-user memory files (auto-created)
 │   ├── archives/              ← Older memory snapshots (auto-created)
 │   └── matrix_store/          ← Matrix sync state (auto-created)
-├── models/                    ← Put your GGUF model files here
+├── models/                    ← All large model files live here
+│   ├── *.gguf                 ← GGUF model files (llama-cpp backend)
+│   └── hf_cache/             ← HuggingFace model downloads (transformers backend)
 ├── src/
 │   ├── main.py                ← Entry point
 │   ├── bot.py                 ← Core logic (trigger detection, prompt building)
@@ -155,6 +157,15 @@ matrix-local-llm-gp-bot/
 ├── setup_wizard.py            ← Interactive first-run setup
 └── requirements.txt
 ```
+
+> **All large files stay inside the repo directory.** GGUF model files are
+> saved to `models/`, and HuggingFace model downloads (transformers backend)
+> are cached in `models/hf_cache/`. The Python virtual environment is created
+> as `.venv/` inside the repo (see [Quick Start](#quick-start)). Every
+> large artifact is therefore co-located with the project — no hunting through
+> `~/.cache/huggingface/` or other hidden directories when you want to free
+> up disk space. The entire `models/` tree and `.venv/` are already listed in
+> `.gitignore` so they are never accidentally committed.
 
 ---
 

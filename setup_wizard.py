@@ -357,6 +357,7 @@ def main() -> None:
             "backend": "llamacpp",
             "model_path": model_path,
             "hf_model_id": "",
+            "hf_cache_dir": "models/hf_cache",
             "hardware_mode": hardware_mode,
             "n_gpu_layers": n_gpu_layers,
             "context_length": 4096,

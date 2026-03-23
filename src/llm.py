@@ -168,13 +168,15 @@ class LLMBackend:
             ) from exc
 
         model_id = self._cfg.hf_model_id
+        cache_dir = self._cfg.hf_cache_dir
         use_gpu = self._cfg.hardware_mode == "gpu" and torch.cuda.is_available()
         device = "cuda" if use_gpu else "cpu"
         logger.info(
-            "Loading HuggingFace model: %s  (device=%s)", model_id, device
+            "Loading HuggingFace model: %s  (device=%s, cache_dir=%s)",
+            model_id, device, cache_dir,
         )
 
-        tokenizer = AutoTokenizer.from_pretrained(model_id)
+        tokenizer = AutoTokenizer.from_pretrained(model_id, cache_dir=cache_dir)
 
         # Use 4-bit quantisation on GPU when available to save VRAM
         if use_gpu:
@@ -186,12 +188,14 @@ class LLMBackend:
                 model_id,
                 quantization_config=bnb_config,
                 device_map="auto",
+                cache_dir=cache_dir,
             )
         else:
             model = AutoModelForCausalLM.from_pretrained(
                 model_id,
                 torch_dtype=torch.float32,
                 low_cpu_mem_usage=True,
+                cache_dir=cache_dir,
             )
             model = model.to(device)
 
