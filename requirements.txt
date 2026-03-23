@@ -6,13 +6,13 @@ python-olm>=3.2.15
 
 # LLM backends (install at least one)
 # Option A: llama-cpp-python (recommended for most users — works on CPU and GPU)
-# llama-cpp-python>=0.2.56
+llama-cpp-python>=0.2.56
 
 # Option B: HuggingFace Transformers (uncomment if you prefer HF models)
-transformers>=4.40.0
-torch>=2.2.0
-accelerate>=0.29.0
-bitsandbytes>=0.43.0  # 4-bit / 8-bit quantization support
+# transformers>=4.40.0
+# torch>=2.2.0
+# accelerate>=0.29.0
+# bitsandbytes>=0.43.0  # 4-bit / 8-bit quantization support
 
 # Configuration & utilities
 pyyaml>=6.0.1

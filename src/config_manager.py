@@ -32,10 +32,10 @@ class MatrixConfig:
     homeserver: str
     username: str
     password: str
-    device_name: str = "LLM-Bot"
     allowed_rooms: List[str] = field(default_factory=list)
-    store_path: str = "data/matrix_store"
     passive_channels: List[str] = field(default_factory=list)
+    device_name: str = "LLM-Bot"
+    store_path: str = "data/matrix_store"
 
 
 @dataclass
@@ -56,16 +56,16 @@ class LLMConfig:
 @dataclass
 @dataclass
 class BotConfig:
-    display_name: str = "GPBot"
     trigger_names: List[str] = field(default_factory=lambda: ["gpbot"])
+    display_name: str = "GPBot"
     persona_file: str = "config/bot_persona.txt"
     chime_in_probability: float = 0.08
     chime_in_cooldown_messages: int = 5
     chime_in_cooldown_seconds: int = 60
     conversation_history_limit: int = 12
     dossier_token_budget: int = 512
-    passive_reply_threshold_high: float = 0.7
-    passive_reply_threshold_low: float = 0.3
+    passive_reply_threshold_high: float = 0.5
+    passive_reply_threshold_low: float = 0.1
 
 
 @dataclass

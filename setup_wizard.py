@@ -239,6 +239,7 @@ def main() -> None:
     password = ask_password("Bot account password")
     device_name = ask_text("Device name (shown in session list)", "LLM-Bot")
 
+
     console.print("\nEnter the room aliases or IDs the bot should listen to.")
     console.print("  Examples: #general:example.org  or  !abc123:example.org")
     console.print("  Leave blank and press Enter when done.\n")
@@ -249,6 +250,15 @@ def main() -> None:
         if not room:
             break
         rooms.append(room)
+
+    # Passive channels prompt
+    console.print("\n(Optional) Enter room aliases or IDs where the bot should only respond passively (e.g., when mentioned or based on probability).\n  Leave blank and press Enter when done.")
+    passive_channels: list[str] = []
+    while True:
+        pchan = ask_text("Passive room (or leave blank to finish)", "").strip()
+        if not pchan:
+            break
+        passive_channels.append(pchan)
 
     # ------------------------------------------------------------------ #
     # 2. Bot personality
@@ -351,6 +361,7 @@ def main() -> None:
             "password": password,
             "device_name": device_name,
             "allowed_rooms": rooms,
+            "passive_channels": passive_channels,
             "store_path": "data/matrix_store",
         },
         "llm": {

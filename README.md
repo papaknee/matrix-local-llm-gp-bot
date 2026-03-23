@@ -179,6 +179,7 @@ Copy `config/config.example.yaml` to `config/config.yaml` and edit it. Every opt
 |---|---|---|
 | `matrix` | `homeserver` | URL of your Matrix server |
 | `matrix` | `allowed_rooms` | List of room aliases/IDs to watch. Empty = all rooms. |
+| `matrix` | `passive_channels` | List of room aliases/IDs where the bot only responds passively (e.g., when mentioned or based on probability). |
 | `llm` | `backend` | `llamacpp` (GGUF) or `transformers` (HuggingFace) |
 | `llm` | `hardware_mode` | `cpu` or `gpu` |
 | `llm` | `n_gpu_layers` | How many layers to offload to GPU (0 = CPU only) |
@@ -189,6 +190,25 @@ Copy `config/config.example.yaml` to `config/config.yaml` and edit it. Every opt
 | `temperature_controller` | `min_temperature` / `max_temperature` | Mood swing range |
 | `memory` | `max_active_entries` | Entries per user before compaction |
 | `memory` | `compaction_interval_hours` | How often the compaction job runs |
+
+---
+
+### Passive Channels
+
+You can configure `passive_channels` under the `matrix:` section in your config file. In these rooms, the bot will only respond passively (for example, when mentioned or based on its chime-in probability), rather than actively replying to all messages. This is useful for rooms where you want the bot to be less intrusive.
+
+Example:
+
+```yaml
+matrix:
+  ...
+  allowed_rooms:
+    - "#general:matrix.example.org"
+    - "#random:matrix.example.org"
+  passive_channels:
+    - "#lurkers:matrix.example.org"
+    - "!passiveRoomId:matrix.example.org"
+```
 
 ---
 

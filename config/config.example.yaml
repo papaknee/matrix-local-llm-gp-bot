@@ -13,12 +13,19 @@ matrix:
   password: "supersecretpassword"             # Bot account password
   device_name: "LLM-Bot"                     # Name shown in session list
 
+
   # Rooms the bot is allowed to listen in and post to.
   # Use room aliases (e.g. #general:example.org) or room IDs (!abc123:example.org).
   # Leave empty ([]) to allow ALL rooms the bot is invited to.
   allowed_rooms:
     - "#general:matrix.example.org"
     - "#random:matrix.example.org"
+
+  # Passive channels: rooms where the bot listens but only responds passively (e.g., when mentioned or based on probability).
+  # Use room aliases or IDs as above. Leave empty ([]) if not needed.
+  passive_channels:
+    - "#lurkers:matrix.example.org"
+    - "!passiveRoomId:matrix.example.org"
 
   # How long to keep read receipts / sync state on disk (seconds).
   # Increase for faster reconnect after downtime.

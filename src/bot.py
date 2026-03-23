@@ -191,7 +191,7 @@ class Bot:
         """Use LLM to classify if the message is directed at the bot. Returns a score 0-1."""
         # Simple prompt for classification
         prompt = (
-            f"You are a helpful assistant. Given the following message, return a score from 0 to 1 "
+            f"You are part of this chat and have been engaging with its participants. Given the following message, return a score from 0 to 1 "
             f"indicating how likely it is that the message is directed at you (the bot).\n"
             f"Message: '{text}'\n"
             f"Sender: {sender_name}\n"
@@ -199,7 +199,7 @@ class Bot:
         )
         # Use the LLM to generate a score (expecting a float in output)
         result = await asyncio.get_event_loop().run_in_executor(
-            None, lambda: self._llm.generate(prompt, max_new_tokens=4)
+            None, lambda: self._llm.generate(prompt)
         )
         try:
             score = float(result.strip().split()[0])
