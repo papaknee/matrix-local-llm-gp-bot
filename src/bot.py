@@ -149,7 +149,7 @@ class Bot:
         passive_channels = set(self._cfg.matrix.passive_channels)
         if room_id in passive_channels or room.canonical_alias in passive_channels:
             # Use LLM to classify if bot is being addressed
-            score = await self._classify_addressed(text, sender_name)
+            score = await self._classify_addressed(text, sender_name, room_id)
             logger.info(f"Passive channel: classified score={score:.2f} for message '{text}'")
             if score >= self._cfg.bot.passive_reply_threshold_high:
                 should_respond = True
@@ -187,23 +187,35 @@ class Bot:
 
         await self._matrix.send_message(room_id, reply)
 
-    async def _classify_addressed(self, text: str, sender_name: str) -> float:
+    async def _classify_addressed(self, text: str, sender_name: str, room_id: str) -> float:
         """Use LLM to classify if the message is directed at the bot. Returns a score 0-1."""
-        # Simple prompt for classification
+        # Gather last 4 messages for context
+        history = list(self._room_history[room_id])[-4:] if room_id and room_id in self._room_history else [(sender_name, text)]
+        transcript = "\n".join([f"{name}: {msg}" for name, msg in history])
+
+        # Few-shot prompt with explicit instructions and examples
         prompt = (
-            f"You are part of this chat and have been engaging with its participants. Given the following message, return a score from 0 to 1 "
-            f"indicating how likely it is that the message is directed at you (the bot).\n"
-            f"Message: '{text}'\n"
-            f"Sender: {sender_name}\n"
-            f"Score (0-1):"
+            "You are an AI assistant in a group chat. Given the transcript of the last few messages, return a single number between 0 and 1 (decimals allowed, e.g., 0.42) indicating how likely it is that the last message is directed at you (the bot).\n"
+            "If the message is addressed to the whole room or multiple bots, lean toward a higher score. If unsure, err on the side of a higher score.\n"
+            "Examples:\n"
+            "Transcript:\nAlice: Hey everyone, how's it going?\nBob: Not bad!\nCharlie: @bot, can you help?\nYou: Sure!\nScore: 1.0\n"
+            "Transcript:\nAlice: What's the weather?\nBob: I think it's sunny.\nCharlie: Anyone know?\nYou: I can check.\nScore: 0.7\n"
+            "Transcript:\nAlice: I love pizza.\nBob: Me too!\nCharlie: Same here.\nYou: \nScore: 0.0\n"
+            f"Transcript:\n{transcript}\nScore:"
         )
         # Use the LLM to generate a score (expecting a float in output)
         result = await asyncio.get_event_loop().run_in_executor(
             None, lambda: self._llm.generate(prompt)
         )
+        import re
         try:
-            score = float(result.strip().split()[0])
-            return max(0.0, min(1.0, score))
+            # Find the first float in the output
+            match = re.search(r"([01](?:\\.\\d+)?|0?\\.\\d+)", result)
+            if match:
+                score = float(match.group(1))
+                return max(0.0, min(1.0, score))
+            else:
+                raise ValueError("No float found")
         except Exception:
             logger.warning(f"Could not parse classification score from LLM output: {result}")
             return 0.0
