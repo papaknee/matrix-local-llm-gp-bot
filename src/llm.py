@@ -193,7 +193,7 @@ class LLMBackend:
         else:
             model = AutoModelForCausalLM.from_pretrained(
                 model_id,
-                torch_dtype=torch.float32,
+                torch_dtype=torch.bfloat16,
                 low_cpu_mem_usage=True,
                 cache_dir=cache_dir,
             )

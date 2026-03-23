@@ -67,7 +67,7 @@ class MatrixClient:
             max_limit_exceeded=0,
             max_timeouts=0,
             store_sync_tokens=True,
-            encryption_enabled=False,  # set True if E2E rooms are needed
+            encryption_enabled=True,  # Enable E2E encryption by default
         )
 
         self._client = AsyncClient(
@@ -77,8 +77,69 @@ class MatrixClient:
             config=client_config,
         )
 
+
+        # Register handlers for plaintext and encrypted events
         if message_callback:
             self._client.add_event_callback(self._on_message, RoomMessageText)
+            # Handle encrypted events (MegolmEvent = m.room.encrypted)
+            try:
+                from nio.events.room_events import MegolmEvent
+                self._client.add_event_callback(self._on_encrypted_message, MegolmEvent)
+            except ImportError:
+                # Fallback: register for all events of type "m.room.encrypted"
+                self._client.add_event_callback(self._on_encrypted_message, "m.room.encrypted")
+
+        # Register interactive verification handler (use event class, not string)
+        try:
+            from nio.events import KeyVerificationStart
+            self._client.add_event_callback(self._on_verification_event, KeyVerificationStart)
+        except ImportError:
+            logger.warning("Could not import KeyVerificationStart for verification handler.")
+
+    async def _on_verification_event(self, room, event):
+        """Handle interactive verification requests (SAS/emoji)."""
+        try:
+            from nio.events import KeyVerificationStart
+            from nio.responses import ToDeviceError
+            if not isinstance(event, KeyVerificationStart):
+                return
+            logger.info("Received verification request from %s", event.sender)
+            # Accept the verification (SAS/emoji)
+            resp = await self._client.accept_key_verification(event.sender, event.transaction_id)
+            if isinstance(resp, ToDeviceError):
+                logger.error("Failed to accept verification: %s", resp.message)
+                return
+            logger.info("Accepted verification request. Waiting for SAS/emoji confirmation…")
+            # Listen for the next steps (SAS/emoji)
+            # In a real bot, you would show the emoji/SAS to the user for manual confirmation
+            # For simplicity, we auto-confirm here
+            await asyncio.sleep(2)
+            await self._client.confirm_short_auth_string(event.sender, event.transaction_id)
+            logger.info("Confirmed SAS/emoji verification with %s", event.sender)
+        except Exception:
+            logger.exception("Failed to handle verification event.")
+
+    async def _on_encrypted_message(self, room, event):
+        """Handle encrypted messages by passing to the main handler if decrypted."""
+        try:
+            # MegolmEvent does not have a decrypt method; nio handles decryption automatically if possible
+            if hasattr(event, 'decrypted') and event.decrypted and hasattr(event, 'body') and event.body:
+                from nio.events.room_events import RoomMessageText
+                fake_event = RoomMessageText(
+                    source=event.source,
+                    decrypted=True,
+                    sender=event.sender,
+                    server_timestamp=event.server_timestamp,
+                    event_id=event.event_id,
+                    room_id=getattr(event, 'room_id', None),
+                    body=event.body,
+                    msgtype=getattr(event, 'msgtype', 'm.text'),
+                )
+                await self._on_message(room, fake_event)
+            else:
+                logger.warning("Encrypted event could not be decrypted or has no body. (decrypted=%s, body=%s)", getattr(event, 'decrypted', None), getattr(event, 'body', None))
+        except Exception:
+            logger.exception("Failed to handle encrypted message.")
 
     # ------------------------------------------------------------------
     # Context manager
