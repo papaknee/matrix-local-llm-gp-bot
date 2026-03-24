@@ -179,12 +179,13 @@ Copy `config/config.example.yaml` to `config/config.yaml` and edit it. Every opt
 |---|---|---|
 | `matrix` | `homeserver` | URL of your Matrix server |
 | `matrix` | `allowed_rooms` | List of room aliases/IDs to watch. Empty = all rooms. |
-| `matrix` | `passive_channels` | List of room aliases/IDs where the bot only responds passively (e.g., when mentioned or based on probability). |
+| `matrix` | `passive_channels` | List of room aliases/IDs where the bot only responds passively (see below). |
 | `llm` | `backend` | `llamacpp` (GGUF) or `transformers` (HuggingFace) |
 | `llm` | `hardware_mode` | `cpu` or `gpu` |
 | `llm` | `n_gpu_layers` | How many layers to offload to GPU (0 = CPU only) |
 | `bot` | `trigger_names` | Words that always trigger a response |
 | `bot` | `chime_in_probability` | 0.0–1.0 chance of spontaneous reply |
+| `bot` | `respond_on_maybe` | If true, bot replies in passive channels when the LLM is unsure (see below) |
 | `bot` | `chime_in_cooldown_seconds` | Min gap between unsolicited posts |
 | `temperature_controller` | `change_interval_minutes` | How often to roll a new mood |
 | `temperature_controller` | `min_temperature` / `max_temperature` | Mood swing range |
@@ -195,7 +196,15 @@ Copy `config/config.example.yaml` to `config/config.yaml` and edit it. Every opt
 
 ### Passive Channels
 
-You can configure `passive_channels` under the `matrix:` section in your config file. In these rooms, the bot will only respond passively (for example, when mentioned or based on its chime-in probability), rather than actively replying to all messages. This is useful for rooms where you want the bot to be less intrusive.
+
+You can configure `passive_channels` under the `matrix:` section in your config file. In these rooms, the bot uses a more conversational, LLM-based approach to decide whether to reply:
+
+- The bot asks the LLM if it should respond to the latest message, using a yes/maybe/no classification.
+- If the answer is "yes", the bot always replies.
+- If the answer is "maybe", the bot replies only if `respond_on_maybe: true` is set under the `bot:` section.
+- If the answer is "no", the bot stays silent.
+
+This makes the bot less intrusive in passive channels, but still able to join in when appropriate.
 
 Example:
 
@@ -208,7 +217,12 @@ matrix:
   passive_channels:
     - "#lurkers:matrix.example.org"
     - "!passiveRoomId:matrix.example.org"
+bot:
+  ...
+  respond_on_maybe: false  # Only reply in passive channels when LLM is confident
 ```
+
+Set `respond_on_maybe: true` if you want the bot to be more talkative in passive channels (it will reply when the LLM is unsure/ambiguous).
 
 ---
 

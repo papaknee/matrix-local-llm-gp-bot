@@ -148,17 +148,15 @@ class Bot:
         # Passive channel logic
         passive_channels = set(self._cfg.matrix.passive_channels)
         if room_id in passive_channels or room.canonical_alias in passive_channels:
-            # Use LLM to classify if bot is being addressed
-            score = await self._classify_addressed(text, sender_name, room_id)
-            logger.info(f"Passive channel: classified score={score:.2f} for message '{text}'")
-            if score >= self._cfg.bot.passive_reply_threshold_high:
+            # Use LLM to classify if bot is being addressed (yes/maybe/no)
+            response_type = await self._classify_addressed(text, sender_name, room_id)
+            logger.info(f"Passive channel: classified response={response_type!r} for message '{text}'")
+            if response_type == "yes":
                 should_respond = True
-            elif score < self._cfg.bot.passive_reply_threshold_low:
-                should_respond = False
+            elif response_type == "maybe":
+                should_respond = self._cfg.bot.respond_on_maybe
             else:
-                # Optionally: ask for clarification or wait
-                logger.info(f"Ambiguous address score in passive channel: {score:.2f}")
-                return
+                should_respond = False
         else:
             triggered = self._is_triggered(text)
             should_respond = triggered or self._should_chime_in(room_id)
@@ -187,38 +185,57 @@ class Bot:
 
         await self._matrix.send_message(room_id, reply)
 
-    async def _classify_addressed(self, text: str, sender_name: str, room_id: str) -> float:
-        """Use LLM to classify if the message is directed at the bot. Returns a score 0-1."""
+    async def _classify_addressed(self, text: str, sender_name: str, room_id: str) -> str:
+        """
+        Use LLM to classify if the message is directed at the bot.
+        Returns: 'yes', 'maybe', or 'no'.
+        """
         # Gather last 4 messages for context
         history = list(self._room_history[room_id])[-4:] if room_id and room_id in self._room_history else [(sender_name, text)]
         transcript = "\n".join([f"{name}: {msg}" for name, msg in history])
 
-        # Few-shot prompt with explicit instructions and examples
+        # Prompt with yes/maybe/no and diverse examples
         prompt = (
-            "You are an AI assistant in a group chat. Given the transcript of the last few messages, return a single number between 0 and 1 (decimals allowed, e.g., 0.42) indicating how likely it is that the last message is directed at you (the bot).\n"
-            "If the message is addressed to the whole room or multiple bots, lean toward a higher score. If unsure, err on the side of a higher score.\n"
+            "You are an AI assistant in a group chat. Given the transcript of the last few messages, answer with one word: \"yes\", \"no\", or \"maybe\" to indicate whether you should reply to the last message.\n"
+            "- \"yes\" if you are being directly addressed or it would be natural for you to respond.\n"
+            "- \"maybe\" if it's ambiguous, group-oriented, or a casual message where a reply could be appropriate.\n"
+            "- \"no\" if you should not reply.\n"
+            "\n"
             "Examples:\n"
-            "Transcript:\nAlice: Hey everyone, how's it going?\nBob: Not bad!\nCharlie: @bot, can you help?\nYou: Sure!\nScore: 1.0\n"
-            "Transcript:\nAlice: What's the weather?\nBob: I think it's sunny.\nCharlie: Anyone know?\nYou: I can check.\nScore: 0.7\n"
-            "Transcript:\nAlice: I love pizza.\nBob: Me too!\nCharlie: Same here.\nYou: \nScore: 0.0\n"
-            f"Transcript:\n{transcript}\nScore:"
+            "Transcript:\nAlice: Can anyone help?\nYou: \nAnswer: yes\n"
+            "Transcript:\nBob: Anyone around?\nYou: \nAnswer: maybe\n"
+            "Transcript:\nCharlie: I love pizza.\nYou: \nAnswer: maybe\n"
+            "Transcript:\nAlice: Good morning, everyone!\nYou: \nAnswer: yes\n"
+            "Transcript:\nBob: What’s up, everyone?\nYou: \nAnswer: yes\n"
+            "Transcript:\nAlice: Anyone want to play a game?\nBob: I'm in!\nCharlie: What game?\nYou: \nAnswer: yes\n"
+            "Transcript:\nAlice: Can someone explain this error?\nBob: Sorry, maybe a bot knows?\nYou: \nAnswer: yes\n"
+            "Transcript:\nCharlie: I just finished my project!\nYou: \nAnswer: yes\n"
+            "Transcript:\nBob: Hi, everyone, let's keep the chat friendly.\nYou: \nAnswer: yes\n"
+            "Transcript:\nAlice: I love pizza.\nBob: Me too!\nCharlie: Same here.\nYou: \nAnswer: yes\n"
+            f"Transcript:\n{transcript}\nAnswer:"
         )
-        # Use the LLM to generate a score (expecting a float in output)
+        # Use the LLM to generate a response
         result = await asyncio.get_event_loop().run_in_executor(
             None, lambda: self._llm.generate(prompt)
         )
-        import re
-        try:
-            # Find the first float in the output
-            match = re.search(r"([01](?:\\.\\d+)?|0?\\.\\d+)", result)
-            if match:
-                score = float(match.group(1))
-                return max(0.0, min(1.0, score))
+        answer = result.strip().lower()
+        if answer.startswith("yes"):
+            return "yes"
+        elif answer.startswith("maybe"):
+            return "maybe"
+        elif answer.startswith("no"):
+            return "no"
+        else:
+            # fallback: try to find yes/maybe/no anywhere in output
+            if "yes" in answer:
+                return "yes"
+            elif "maybe" in answer:
+                return "maybe"
+            elif "no" in answer:
+                return "no"
             else:
-                raise ValueError("No float found")
-        except Exception:
-            logger.warning(f"Could not parse classification score from LLM output: {result}")
-            return 0.0
+                logger.warning(f"Could not parse yes/maybe/no from LLM output: {result}")
+                return "no"
 
         # Update cooldown state
         self._last_bot_post_time[room_id] = time.monotonic()

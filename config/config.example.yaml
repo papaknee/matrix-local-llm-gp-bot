@@ -115,6 +115,14 @@ bot:
   # If the dossier exceeds this, it is automatically summarised first.
   dossier_token_budget: 512
 
+  # If true, the bot will respond in passive channels when the LLM returns 'maybe' (not just 'yes').
+  # If false, the bot only responds when the LLM is confident ('yes').
+  respond_on_maybe: false
+
+  # (Obsolete, do not use):
+  # passive_reply_threshold_high: 0.5
+  # passive_reply_threshold_low: 0.1
+
 # ──────────────────────────────────────────────────────────────
 # TEMPERATURE / MOOD CONTROLLER
 # ──────────────────────────────────────────────────────────────

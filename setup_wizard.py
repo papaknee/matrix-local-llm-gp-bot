@@ -260,6 +260,7 @@ def main() -> None:
             break
         passive_channels.append(pchan)
 
+
     # ------------------------------------------------------------------ #
     # 2. Bot personality
     # ------------------------------------------------------------------ #
@@ -271,6 +272,15 @@ def main() -> None:
     )
     triggers_raw = ask_text("Trigger names (comma-separated)", display_name.lower())
     triggers = [t.strip().lower() for t in triggers_raw.split(",") if t.strip()]
+
+    # Respond on 'maybe' in passive channels
+    console.print(
+        "\n[Optional] In passive channels, the bot uses the LLM to decide if it should reply.\n"
+        "If the LLM is unsure (answers 'maybe'), should the bot reply anyway?\n"
+        "[bold]No[/bold] = only reply when the LLM is confident.\n"
+        "[bold]Yes[/bold] = reply even when the LLM is unsure/ambiguous.\n"
+    )
+    respond_on_maybe = ask_confirm("Reply in passive channels when LLM is unsure ('maybe')?", default=False)
 
     # ------------------------------------------------------------------ #
     # 3. Model selection
@@ -386,6 +396,7 @@ def main() -> None:
             "chime_in_cooldown_seconds": 60,
             "conversation_history_limit": 12,
             "dossier_token_budget": 512,
+            "respond_on_maybe": respond_on_maybe,
         },
         "temperature_controller": {
             "enabled": True,

@@ -64,8 +64,7 @@ class BotConfig:
     chime_in_cooldown_seconds: int = 60
     conversation_history_limit: int = 12
     dossier_token_budget: int = 512
-    passive_reply_threshold_high: float = 0.5
-    passive_reply_threshold_low: float = 0.1
+    respond_on_maybe: bool = False
 
 
 @dataclass
@@ -180,8 +179,7 @@ class ConfigManager:
             chime_in_cooldown_seconds=int(d.get("chime_in_cooldown_seconds", 60)),
             conversation_history_limit=int(d.get("conversation_history_limit", 12)),
             dossier_token_budget=int(d.get("dossier_token_budget", 512)),
-            passive_reply_threshold_high=float(d.get("passive_reply_threshold_high", 0.7)),
-            passive_reply_threshold_low=float(d.get("passive_reply_threshold_low", 0.3)),
+            respond_on_maybe=bool(d.get("respond_on_maybe", False)),
         )
 
     @staticmethod
