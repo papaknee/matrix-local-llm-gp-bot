@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 from src.config_manager import MemoryConfig
-from src.memory_manager import MemoryManager, _safe_filename
+from src.memory_manager import MemoryManager, _safe_filename, estimate_token_usage
 
 
 # ---------------------------------------------------------------------------
@@ -238,3 +238,52 @@ class TestGetKnownUsers:
         mm.record_interaction("@bob:example.org", "Bob", "hi", "sup")
         users = mm.get_known_users()
         assert len(users) == 2
+
+
+class TestEstimateTokenUsage:
+    def test_empty_string(self):
+        assert estimate_token_usage("") == 0
+
+    def test_short_string(self):
+        # 12 chars → 3 tokens
+        assert estimate_token_usage("hello world!") == 3
+
+    def test_longer_string(self):
+        text = "a" * 400
+        assert estimate_token_usage(text) == 100
+
+
+class TestGetAllMessages:
+    def test_empty_when_no_dossiers(self, tmp_path):
+        cfg = _make_config(tmp_path)
+        mm = MemoryManager(cfg)
+        assert mm.get_all_messages() == []
+
+    def test_returns_messages_from_single_user(self, tmp_path):
+        cfg = _make_config(tmp_path)
+        mm = MemoryManager(cfg)
+        mm.record_interaction("@alice:example.org", "Alice", "Hello!", "Hi there!")
+        msgs = mm.get_all_messages()
+        # Should contain both user message and bot response
+        assert len(msgs) == 2
+        senders = [m["sender"] for m in msgs]
+        assert "Alice" in senders
+        assert "bot" in senders
+
+    def test_returns_messages_from_multiple_users(self, tmp_path):
+        cfg = _make_config(tmp_path)
+        mm = MemoryManager(cfg)
+        mm.record_interaction("@alice:example.org", "Alice", "Hi", "Hey")
+        mm.record_interaction("@bob:example.org", "Bob", "Hello", "Sup")
+        msgs = mm.get_all_messages()
+        # 2 users × 2 messages each (user msg + bot response)
+        assert len(msgs) == 4
+
+    def test_messages_sorted_by_timestamp(self, tmp_path):
+        cfg = _make_config(tmp_path)
+        mm = MemoryManager(cfg)
+        mm.record_interaction("@alice:example.org", "Alice", "First", "Reply1")
+        mm.record_interaction("@alice:example.org", "Alice", "Second", "Reply2")
+        msgs = mm.get_all_messages()
+        timestamps = [m["timestamp"] for m in msgs]
+        assert timestamps == sorted(timestamps)

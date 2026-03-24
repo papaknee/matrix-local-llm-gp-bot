@@ -72,11 +72,19 @@ async def _run(config_path: str) -> None:
     logger.info("=" * 60)
 
     bot = Bot(cfg)
-    await bot.start()
 
-    # Start periodic thoughts.py runner
+    # Start periodic thoughts runner before bot.start() (which blocks)
     interval = getattr(cfg.bot, 'thoughts_interval_seconds', 3600)
-    asyncio.create_task(run_thoughts_periodically(interval))
+    thoughts_task = asyncio.create_task(run_thoughts_periodically(interval))
+
+    try:
+        await bot.start()
+    finally:
+        thoughts_task.cancel()
+        try:
+            await thoughts_task
+        except asyncio.CancelledError:
+            pass
 
 
 async def run_thoughts_periodically(interval: int):

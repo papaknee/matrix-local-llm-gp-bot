@@ -27,7 +27,6 @@ import yaml
 
 
 @dataclass
-@dataclass
 class MatrixConfig:
     homeserver: str
     username: str
@@ -53,7 +52,6 @@ class LLMConfig:
     repeat_penalty: float = 1.1
 
 
-@dataclass
 @dataclass
 class BotConfig:
     trigger_names: List[str] = field(default_factory=lambda: ["gpbot"])

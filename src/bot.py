@@ -36,6 +36,8 @@ from __future__ import annotations
 import asyncio
 import logging
 import random
+import re
+import sys
 import time
 from collections import defaultdict, deque
 from pathlib import Path
@@ -142,9 +144,17 @@ class Bot:
             return
 
         # --- Special utility commands (not included in memory/history) ---
-        device_name = self._cfg.bot.display_name.lower()
-        if text.lower().startswith(f"{device_name} --"):
-            await self._handle_special_command(room, text.strip(), device_name)
+        text_lower = text.lower().strip()
+        all_names = set([self._cfg.bot.display_name.lower()])
+        all_names.update(n.lower() for n in self._cfg.bot.trigger_names)
+
+        for name in all_names:
+            if text_lower.startswith(f"{name} --"):
+                await self._handle_special_command(room, text.strip(), name)
+                return
+
+        # Skip any "<word> --" messages entirely (special commands for other bots)
+        if re.match(r"^\S+\s+--", text_lower):
             return
 
         # Update room history
@@ -190,6 +200,22 @@ class Bot:
             return
 
         await self._matrix.send_message(room_id, reply)
+
+        # Update cooldown state
+        self._last_bot_post_time[room_id] = time.monotonic()
+        self._messages_since_last_post[room_id] = 0
+
+        # Persist interaction to dossier
+        try:
+            self._memory.record_interaction(
+                user_id=sender_id,
+                display_name=sender_name,
+                message=text,
+                bot_response=reply,
+                room_id=room_id,
+            )
+        except Exception:
+            logger.exception("Failed to record interaction for %s", sender_id)
 
     async def _classify_addressed(self, text: str, sender_name: str, room_id: str) -> str:
         """
@@ -242,22 +268,6 @@ class Bot:
             else:
                 logger.warning(f"Could not parse yes/maybe/no from LLM output: {result}")
                 return "no"
-
-        # Update cooldown state
-        self._last_bot_post_time[room_id] = time.monotonic()
-        self._messages_since_last_post[room_id] = 0
-
-        # Persist interaction to dossier
-        try:
-            self._memory.record_interaction(
-                user_id=sender_id,
-                display_name=sender_name,
-                message=text,
-                bot_response=reply,
-                room_id=room_id,
-            )
-        except Exception:
-            logger.exception("Failed to record interaction for %s", sender_id)
 
     # ------------------------------------------------------------------
     # Trigger detection
@@ -332,23 +342,20 @@ class Bot:
         )
 
         # Strip any leading 'name: ' prefix (case-insensitive, any participant)
-        import re
         reply = re.sub(r"^\s*\w+: ", "", raw_reply, count=1, flags=re.IGNORECASE)
         return reply
 
-    async def _handle_special_command(self, room: MatrixRoom, text: str, device_name: str) -> None:
+    async def _handle_special_command(self, room: MatrixRoom, text: str, trigger_name: str) -> None:
         """Handle special utility commands that are not included in memory/history."""
-        import subprocess
-        import re
-        from pathlib import Path
-        command = text[len(device_name):].strip()
+        command = text[len(trigger_name):].strip()
+        display = self._cfg.bot.display_name
         if command == "--help":
             help_text = (
-                f"Special commands for {device_name}:\n"
-                f"  {device_name} --help           Show this help message.\n"
-                f"  {device_name} --run_thoughts   Run thoughts.py and return the latest thought.\n"
-                f"  {device_name} --context_report Show current context/memory usage.\n"
-                f"  {device_name} --compact        Run compaction on archives, dossiers, and thoughts.\n"
+                f"Special commands for {display}:\n"
+                f"  {display} --help           Show this help message.\n"
+                f"  {display} --run_thoughts   Run thoughts.py and return the latest thought.\n"
+                f"  {display} --context_report Show current context/memory usage.\n"
+                f"  {display} --compact        Run compaction on archives, dossiers, and thoughts.\n"
             )
             await self._matrix.send_message(room.room_id, help_text)
             return

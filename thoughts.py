@@ -85,8 +85,9 @@ def compact_log():
 
 def main():
     cfg = ConfigManager("config/config.yaml")
-    memory_mgr = MemoryManager(cfg)
+    memory_mgr = MemoryManager(cfg.memory)
     llm = LLMBackend(cfg.llm)
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
     state = load_state()
     history = get_conversation_history(memory_mgr, state.get("last_msg_idx", 0))
     if not history:
