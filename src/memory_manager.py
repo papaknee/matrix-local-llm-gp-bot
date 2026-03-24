@@ -52,6 +52,11 @@ logger = logging.getLogger(__name__)
 _UNSAFE_CHARS = re.compile(r"[^\w\-]")
 
 
+def estimate_token_usage(text: str) -> int:
+    """Rough token estimate: 1 token ≈ 4 characters."""
+    return len(text) // 4
+
+
 def _safe_filename(user_id: str) -> str:
     """Convert a Matrix user ID into a filesystem-safe filename stem."""
     return _UNSAFE_CHARS.sub("_", user_id).strip("_") or "unknown_user"
@@ -186,6 +191,34 @@ class MemoryManager:
             except Exception:
                 logger.debug("Could not read user_id from %s", path)
         return users
+
+    def get_all_messages(self) -> List[Dict[str, Any]]:
+        """Return all recorded messages from every dossier, sorted by timestamp.
+
+        Each item is a dict with keys ``timestamp``, ``sender``, and ``text``.
+        Both user messages and bot responses are included.
+        """
+        all_msgs: List[Dict[str, Any]] = []
+        for path in self._dossier_dir.glob("*.json"):
+            try:
+                data = self._load_path(path)
+                display_name = data.get("display_name") or data.get("user_id", "unknown")
+                for entry in data.get("entries", []):
+                    ts = entry.get("timestamp", "")
+                    user_msg = entry.get("user_message", "")
+                    if user_msg:
+                        all_msgs.append(
+                            {"timestamp": ts, "sender": display_name, "text": user_msg}
+                        )
+                    bot_resp = entry.get("bot_response", "")
+                    if bot_resp:
+                        all_msgs.append(
+                            {"timestamp": ts, "sender": "bot", "text": bot_resp}
+                        )
+            except Exception:
+                logger.debug("Could not read messages from %s", path)
+        all_msgs.sort(key=lambda m: m.get("timestamp", ""))
+        return all_msgs
 
     def compact_all(self) -> int:
         """Run compaction on all dossiers that need it.
