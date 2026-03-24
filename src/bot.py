@@ -141,6 +141,12 @@ class Bot:
         if not text.strip():
             return
 
+        # --- Special utility commands (not included in memory/history) ---
+        device_name = self._cfg.bot.display_name.lower()
+        if text.lower().startswith(f"{device_name} --"):
+            await self._handle_special_command(room, text.strip(), device_name)
+            return
+
         # Update room history
         self._room_history[room_id].append((sender_name, text))
         self._messages_since_last_post[room_id] += 1
@@ -329,3 +335,64 @@ class Bot:
         import re
         reply = re.sub(r"^\s*\w+: ", "", raw_reply, count=1, flags=re.IGNORECASE)
         return reply
+
+    async def _handle_special_command(self, room: MatrixRoom, text: str, device_name: str) -> None:
+        """Handle special utility commands that are not included in memory/history."""
+        import subprocess
+        import re
+        from pathlib import Path
+        command = text[len(device_name):].strip()
+        if command == "--help":
+            help_text = (
+                f"Special commands for {device_name}:\n"
+                f"  {device_name} --help           Show this help message.\n"
+                f"  {device_name} --run_thoughts   Run thoughts.py and return the latest thought.\n"
+                f"  {device_name} --context_report Show current context/memory usage.\n"
+                f"  {device_name} --compact        Run compaction on archives, dossiers, and thoughts.\n"
+            )
+            await self._matrix.send_message(room.room_id, help_text)
+            return
+        elif command == "--run_thoughts":
+            proc = await asyncio.create_subprocess_exec(
+                sys.executable, "thoughts.py",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            await proc.communicate()
+            # Read the last entry from thoughts.log
+            log_path = Path("data/thoughts.log")
+            if log_path.exists():
+                with log_path.open("r") as f:
+                    entries = f.read().strip().split("\n\n")
+                    last = entries[-1] if entries else "(No thoughts logged.)"
+                await self._matrix.send_message(room.room_id, f"Latest thought:\n{last}")
+            else:
+                await self._matrix.send_message(room.room_id, "No thoughts.log found.")
+            return
+        elif command == "--context_report":
+            # Example: show tokens used in thoughts.log and dossiers
+            from src.memory_manager import estimate_token_usage
+            log_path = Path("data/thoughts.log")
+            log_tokens = 0
+            if log_path.exists():
+                with log_path.open("r") as f:
+                    log_tokens = estimate_token_usage(f.read())
+            # You can add dossier/archives usage here as needed
+            context_len = self._cfg.llm.context_length
+            pct = (log_tokens / context_len) * 100 if context_len else 0
+            msg = f"Thoughts log: {log_tokens} tokens ({pct:.1f}% of context window)"
+            await self._matrix.send_message(room.room_id, msg)
+            return
+        elif command == "--compact":
+            # Run compaction on thoughts, dossiers, and archives
+            proc = await asyncio.create_subprocess_exec(
+                sys.executable, "thoughts.py", "--compact",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            await proc.communicate()
+            # You can add dossier/archive compaction here as needed
+            await self._matrix.send_message(room.room_id, "Compaction complete.")
+            return
+        else:
+            await self._matrix.send_message(room.room_id, f"Unknown special command: {command}")

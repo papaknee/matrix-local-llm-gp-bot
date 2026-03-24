@@ -448,3 +448,70 @@ The bot periodically summarizes recent events and discussions from its own persp
 - If the log grows too large (over ~30% of the LLM's context window), older entries are compacted into a summary to keep the log usable as context
 
 This log can be used as additional context for the bot, or for reviewing the bot's evolving memory and perspective over time.
+
+---
+
+## Special Utility Commands
+
+The bot supports special commands (not included in chat history or memory) for server management and introspection. Use these by typing them in the chat, replacing `{device_name}` with the bot's display name (e.g., `baxter --help`).
+
+**Available commands:**
+
+- `{device_name} --help`           
+  Show this help message listing all special commands.
+
+- `{device_name} --run_thoughts`   
+  Run thoughts.py immediately and return the latest entry from thoughts.log.
+
+- `{device_name} --context_report` 
+  Show current context/memory usage (e.g., tokens used in thoughts.log and percent of the LLM context window).
+
+- `{device_name} --compact`        
+  Run compaction on archives, dossiers, and thoughts.log, then report completion.
+
+**Notes:**
+- These commands are utility-only: they are not included in the bot's chat history, memory, or dossiers.
+- Responses are sent as direct replies in the chat.
+- You can use these commands for bot maintenance, diagnostics, and memory management.
+
+---
+
+## Updating to the Latest Version (Safe Upgrade Guide)
+
+To update your bot to the latest version without losing your memory files, logs, or configuration, follow these steps:
+
+1. **Backup (optional but recommended):**
+   - Your bot's memory and logs are stored in the `data/` directory. To be extra safe, you can make a backup:
+     ```bash
+     cp -r data data_backup
+     cp config/config.yaml config/config.yaml.bak
+     ```
+
+2. **Pull the latest code:**
+   - Make sure you are in your bot's project directory:
+     ```bash
+     cd matrix-local-llm-gp-bot
+     git pull origin main
+     ```
+   - This will update the code, but will NOT overwrite your `data/` directory or your `config/config.yaml`.
+
+3. **Update dependencies (if needed):**
+   - If there are new dependencies, update your virtual environment:
+     ```bash
+     source .venv/bin/activate
+     pip install -r requirements.txt
+     ```
+
+4. **Review new config options:**
+   - If the update adds new configuration options, compare your `config/config.yaml` with `config/config.example.yaml` and add any new settings you want.
+
+5. **Restart the bot:**
+   - Stop the running bot (if needed) and start it again:
+     ```bash
+     python -m src.main
+     ```
+
+**Notes:**
+- The update process will NOT overwrite your memory files, logs, or configuration.
+- Only the code and default/example files are updated by `git pull`.
+- If you ever need to restore from backup, just copy your backup files back into place.
