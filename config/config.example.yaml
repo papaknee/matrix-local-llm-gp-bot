@@ -172,3 +172,6 @@ logging:
 
   # Optional log file path.  Leave empty to log to console only.
   file: "data/bot.log"
+
+# How often (in seconds) to run thoughts.py for bot summarization/memory. Default: 3600 (1 hour)
+  thoughts_interval_seconds: 3600

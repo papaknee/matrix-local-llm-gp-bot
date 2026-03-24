@@ -74,6 +74,25 @@ async def _run(config_path: str) -> None:
     bot = Bot(cfg)
     await bot.start()
 
+    # Start periodic thoughts.py runner
+    interval = getattr(cfg.bot, 'thoughts_interval_seconds', 3600)
+    asyncio.create_task(run_thoughts_periodically(interval))
+
+
+async def run_thoughts_periodically(interval: int):
+    while True:
+        proc = await asyncio.create_subprocess_exec(
+            sys.executable, "thoughts.py",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, stderr = await proc.communicate()
+        if stdout:
+            logging.getLogger("thoughts").info(stdout.decode().strip())
+        if stderr:
+            logging.getLogger("thoughts").error(stderr.decode().strip())
+        await asyncio.sleep(interval)
+
 
 def main() -> None:
     config_path = "config/config.yaml"

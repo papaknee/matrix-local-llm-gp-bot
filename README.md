@@ -434,4 +434,17 @@ Run two bot accounts with different personas in the same room and let users rate
 
 ---
 
-*Built with [matrix-nio](https://github.com/poljar/matrix-nio) and [llama-cpp-python](https://github.com/abetlen/llama-cpp-python). Personality sold separately.*
+## Automated Bot Thoughts & Memory (`thoughts.py`)
+
+The bot periodically summarizes recent events and discussions from its own perspective, writing these "thoughts" to `data/thoughts.log` with timestamps. This log serves as a persistent, human-readable memory for the bot, capturing:
+- Factual events and interesting discussions since the last summary
+- The bot's own thoughts or opinions on users and conversations
+- Summaries are generated using the LLM for natural, insightful output
+
+**How it works:**
+- `thoughts.py` can be run manually or scheduled (e.g., every hour or every 12 bot responses)
+- Loads recent conversation history and generates a summary from the bot's perspective
+- Appends each summary to `data/thoughts.log` with a timestamp
+- If the log grows too large (over ~30% of the LLM's context window), older entries are compacted into a summary to keep the log usable as context
+
+This log can be used as additional context for the bot, or for reviewing the bot's evolving memory and perspective over time.

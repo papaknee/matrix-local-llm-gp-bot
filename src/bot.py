@@ -314,13 +314,18 @@ class Bot:
         messages: List[dict] = []
         for spkr, msg in recent[:-1]:  # exclude the triggering message
             role = "assistant" if spkr == self._cfg.bot.display_name else "user"
-            messages.append({"role": role, "content": f"{spkr}: {msg}"})
+            messages.append({"role": role, "content": msg})
 
         # The current message is the final user turn
-        messages.append({"role": "user", "content": f"{sender_name}: {text}"})
+        messages.append({"role": "user", "content": text})
 
-        return self._llm.generate(
+        raw_reply = self._llm.generate(
             system_prompt=system_prompt,
             messages=messages,
             temperature=self._temp_ctrl.temperature,
         )
+
+        # Strip any leading 'name: ' prefix (case-insensitive, any participant)
+        import re
+        reply = re.sub(r"^\s*\w+: ", "", raw_reply, count=1, flags=re.IGNORECASE)
+        return reply
