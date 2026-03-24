@@ -146,7 +146,7 @@ class Bot:
         # --- Special utility commands (not included in memory/history) ---
         text_lower = text.lower().strip()
         all_names = set([self._cfg.bot.display_name.lower()])
-        all_names.update(self._cfg.bot.trigger_names)
+        all_names.update(n.lower() for n in self._cfg.bot.trigger_names)
 
         for name in all_names:
             if text_lower.startswith(f"{name} --"):
@@ -345,9 +345,9 @@ class Bot:
         reply = re.sub(r"^\s*\w+: ", "", raw_reply, count=1, flags=re.IGNORECASE)
         return reply
 
-    async def _handle_special_command(self, room: MatrixRoom, text: str, device_name: str) -> None:
+    async def _handle_special_command(self, room: MatrixRoom, text: str, trigger_name: str) -> None:
         """Handle special utility commands that are not included in memory/history."""
-        command = text[len(device_name):].strip()
+        command = text[len(trigger_name):].strip()
         display = self._cfg.bot.display_name
         if command == "--help":
             help_text = (
