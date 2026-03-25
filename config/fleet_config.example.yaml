@@ -1,0 +1,24 @@
+# Fleet Configuration Example
+# ============================
+# This file tells the multi-bot orchestrator where to find the route-bot
+# and each child bot's configuration.
+#
+# The route-bot is a small LLM that monitors conversations and decides
+# which child bot should respond.  It never speaks in chat.
+#
+# Each child bot has a standard config.yaml (same as single-bot mode)
+# and can also be run standalone with:  python -m src.main bots/<name>/config/config.yaml
+#
+# Start the fleet with:
+#   python -m src.main --multi
+# Or just:
+#   python -m src.main    (auto-detects bots/fleet_config.yaml)
+
+route_bot:
+  config_path: "bots/route_bot/config/config.yaml"
+
+bots:
+  - name: "alice"
+    config_path: "bots/alice/config/config.yaml"
+  - name: "bob"
+    config_path: "bots/bob/config/config.yaml"

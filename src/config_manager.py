@@ -112,8 +112,9 @@ class ConfigManager:
         If required fields are missing or values are invalid.
     """
 
-    def __init__(self, config_path: str = "config/config.yaml") -> None:
+    def __init__(self, config_path: str = "config/config.yaml", *, route_bot_only: bool = False) -> None:
         self._path = Path(config_path)
+        self._route_bot_only = route_bot_only
         if not self._path.exists():
             raise FileNotFoundError(
                 f"Config file not found: {self._path}\n"
@@ -123,6 +124,7 @@ class ConfigManager:
         with self._path.open("r", encoding="utf-8") as fh:
             raw: dict = yaml.safe_load(fh) or {}
 
+        # Route-bot only needs the LLM section; parse others with defaults
         self.matrix = self._parse_matrix(raw.get("matrix", {}))
         self.llm = self._parse_llm(raw.get("llm", {}))
         self.bot = self._parse_bot(raw.get("bot", {}))
@@ -216,12 +218,14 @@ class ConfigManager:
     def _validate(self) -> None:
         errors: List[str] = []
 
-        if not self.matrix.homeserver:
-            errors.append("matrix.homeserver is required")
-        if not self.matrix.username:
-            errors.append("matrix.username is required")
-        if not self.matrix.password:
-            errors.append("matrix.password is required")
+        # Route-bot only needs LLM validation
+        if not self._route_bot_only:
+            if not self.matrix.homeserver:
+                errors.append("matrix.homeserver is required")
+            if not self.matrix.username:
+                errors.append("matrix.username is required")
+            if not self.matrix.password:
+                errors.append("matrix.password is required")
 
         if self.llm.backend not in ("llamacpp", "transformers"):
             errors.append(

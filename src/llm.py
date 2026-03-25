@@ -25,6 +25,7 @@ Usage
 
 from __future__ import annotations
 
+import gc
 import logging
 from typing import List, Optional
 
@@ -106,8 +107,25 @@ class LLMBackend:
         return self._generate_transformers(system_prompt, messages, temp)
 
     def unload(self) -> None:
-        """Free the model from memory."""
+        """Free the model from memory (including GPU VRAM)."""
+        if self._model is None:
+            return
+        model_ref = self._model
         self._model = None
+        del model_ref
+        gc.collect()
+        try:
+            import torch  # type: ignore[import-untyped]
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+        except ImportError:
+            pass
+        logger.info("Model unloaded and memory released.")
+
+    @property
+    def is_loaded(self) -> bool:
+        """Return True if a model is currently loaded in memory."""
+        return self._model is not None
 
     # ------------------------------------------------------------------
     # llama-cpp-python backend

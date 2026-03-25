@@ -3,12 +3,16 @@ src/main.py
 ===========
 Entry point for the Matrix LLM Bot.
 
-Run with:
+Single-bot mode:
     python -m src.main
-or:
-    python src/main.py
+    python -m src.main config/config.yaml
 
-The script sets up logging, loads configuration, and starts the bot.
+Multi-bot mode (auto-detected or explicit):
+    python -m src.main --multi
+    python -m src.main --multi bots/fleet_config.yaml
+
+The script sets up logging, loads configuration, and starts the bot (or the
+multi-bot orchestrator).
 """
 
 from __future__ import annotations
@@ -102,23 +106,75 @@ async def run_thoughts_periodically(interval: int):
         await asyncio.sleep(interval)
 
 
+async def _run_multi(fleet_config_path: str) -> None:
+    """Start the multi-bot orchestrator."""
+    from src.config_manager import ConfigManager
+    from src.fleet_config import FleetConfig
+    from src.orchestrator import Orchestrator
+
+    fleet = FleetConfig(fleet_config_path)
+    # Use the first child bot's logging config for the fleet
+    first_bot_cfg = ConfigManager(fleet.child_bots[0].config_path)
+    setup_logging(first_bot_cfg.logging.level, first_bot_cfg.logging.file)
+
+    logger = logging.getLogger("main")
+    logger.info("=" * 60)
+    logger.info("  Matrix LLM Bot — Multi-Bot Orchestrator")
+    logger.info("  Fleet config: %s", fleet_config_path)
+    logger.info("  Route-bot config: %s", fleet.route_bot_config_path)
+    logger.info("  Child bots: %s", [b.name for b in fleet.child_bots])
+    logger.info("=" * 60)
+
+    orch = Orchestrator(fleet)
+    await orch.start()
+
+
 def main() -> None:
-    config_path = "config/config.yaml"
-    if len(sys.argv) > 1:
-        config_path = sys.argv[1]
+    # Parse arguments
+    args = sys.argv[1:]
+    multi_mode = False
+    config_path = None
 
-    if not Path(config_path).exists():
-        print(
-            f"\n[ERROR] Config file not found: {config_path}\n"
-            "Run the setup wizard first:\n\n"
-            "    python setup_wizard.py\n"
-        )
-        sys.exit(1)
+    # Check for --multi flag
+    if "--multi" in args:
+        multi_mode = True
+        args.remove("--multi")
 
-    try:
-        asyncio.run(_run(config_path))
-    except KeyboardInterrupt:
-        print("\nShutting down — goodbye!")
+    if args:
+        config_path = args[0]
+
+    # Auto-detect multi-bot mode if fleet_config.yaml exists
+    default_fleet_path = "bots/fleet_config.yaml"
+    if not multi_mode and config_path is None and Path(default_fleet_path).exists():
+        multi_mode = True
+
+    if multi_mode:
+        fleet_path = config_path or default_fleet_path
+        if not Path(fleet_path).exists():
+            print(
+                f"\n[ERROR] Fleet config not found: {fleet_path}\n"
+                "Run the setup wizard in multi-bot mode first:\n\n"
+                "    python setup_wizard.py\n"
+            )
+            sys.exit(1)
+        try:
+            asyncio.run(_run_multi(fleet_path))
+        except KeyboardInterrupt:
+            print("\nShutting down fleet — goodbye!")
+    else:
+        # Single-bot mode
+        single_config = config_path or "config/config.yaml"
+        if not Path(single_config).exists():
+            print(
+                f"\n[ERROR] Config file not found: {single_config}\n"
+                "Run the setup wizard first:\n\n"
+                "    python setup_wizard.py\n"
+            )
+            sys.exit(1)
+        try:
+            asyncio.run(_run(single_config))
+        except KeyboardInterrupt:
+            print("\nShutting down — goodbye!")
 
 
 if __name__ == "__main__":

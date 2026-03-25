@@ -2,6 +2,8 @@
 
 A self-hosted, personality-rich Matrix chat bot that runs a local Large Language Model (LLM) entirely on **your own hardware** — no cloud API keys required. The bot knows who it's talking to, has mood swings, and occasionally barges into conversations uninvited like a real community member.
 
+Supports **single-bot** and **multi-bot fleet** deployments — run several distinct bot personalities on a single GPU, with an intelligent route-bot that decides which bot should respond to each message.
+
 ---
 
 ## Table of Contents
@@ -15,10 +17,11 @@ A self-hosted, personality-rich Matrix chat bot that runs a local Large Language
 7. [Customising the Bot's Personality](#customising-the-bots-personality)
 8. [User Dossiers — How the Bot Remembers People](#user-dossiers--how-the-bot-remembers-people)
 9. [Mood Swings — The Temperature Controller](#mood-swings--the-temperature-controller)
-10. [Running the Bot](#running-the-bot)
-11. [Troubleshooting](#troubleshooting)
-12. [Ideas to Make the Bot Even Better](#ideas-to-make-the-bot-even-better)
-13. [Security Notes](#security-notes)
+10. [Multi-Bot Fleet Mode](#multi-bot-fleet-mode)
+11. [Running the Bot](#running-the-bot)
+12. [Troubleshooting](#troubleshooting)
+13. [Ideas to Make the Bot Even Better](#ideas-to-make-the-bot-even-better)
+14. [Security Notes](#security-notes)
 
 ---
 
@@ -31,7 +34,8 @@ A self-hosted, personality-rich Matrix chat bot that runs a local Large Language
 - **Mood swings** — the bot's LLM temperature (creativity/feistiness dial) changes randomly on a schedule. One minute it's calm and helpful; thirty minutes later it's chaotic and opinionated.
 - **Spontaneous chime-ins** — configurable probability that the bot inserts itself into a conversation even when not directly addressed.
 - **Trigger names** — the bot *always* responds when its name or configured nicknames appear in a message.
-- **Interactive setup wizard** — no code editing required to get started.
+- **Multi-bot fleet mode** — deploy several distinct bot personalities behind a single route-bot that manages them. Only one LLM is loaded at a time, so you can run bigger models on a single GPU.
+- **Interactive setup wizard** — no code editing required to get started. Supports both single-bot and multi-bot fleet setup.
 
 ---
 
@@ -87,7 +91,9 @@ pip install -r requirements.txt
 python setup_wizard.py
 ```
 
-The wizard will ask you for:
+The wizard will ask you to choose between **single-bot** or **multi-bot fleet** mode.
+
+**Single-bot** — the wizard asks for:
 - Your Matrix server URL, bot username, and password
 - Which rooms the bot should listen in
 - Which model to download (or where your model already is)
@@ -96,10 +102,16 @@ The wizard will ask you for:
 
 It will then write `config/config.yaml` and optionally download your chosen model.
 
+**Multi-bot fleet** — see [Multi-Bot Fleet Mode](#multi-bot-fleet-mode) below for the full walkthrough.
+
 ### 5. Start the bot
 
 ```bash
+# Single-bot mode:
 python -m src.main
+
+# Multi-bot fleet mode (auto-detected if bots/fleet_config.yaml exists):
+python -m src.main --multi
 ```
 
 That's it! The bot will log in, join its allowed rooms, and start listening.
@@ -136,7 +148,13 @@ A GPU with **6 GB VRAM** can run the Mistral 7B Q4 model entirely on-GPU at ~50 
 matrix-local-llm-gp-bot/
 ├── config/
 │   ├── config.example.yaml    ← Template — copy to config.yaml
+│   ├── fleet_config.example.yaml ← Template for multi-bot fleet config
 │   └── bot_persona.txt        ← The bot's personality instructions
+├── bots/                      ← Multi-bot fleet (auto-created by wizard)
+│   ├── fleet_config.yaml      ← Fleet orchestration config
+│   ├── route_bot/config/      ← Route-bot LLM config (no Matrix account)
+│   ├── alice/config/          ← Child bot "alice" config + persona
+│   └── bob/config/            ← Child bot "bob" config + persona
 ├── data/
 │   ├── dossiers/              ← Per-user memory files (auto-created)
 │   ├── archives/              ← Older memory snapshots (auto-created)
@@ -145,16 +163,19 @@ matrix-local-llm-gp-bot/
 │   ├── *.gguf                 ← GGUF model files (llama-cpp backend)
 │   └── hf_cache/             ← HuggingFace model downloads (transformers backend)
 ├── src/
-│   ├── main.py                ← Entry point
-│   ├── bot.py                 ← Core logic (trigger detection, prompt building)
+│   ├── main.py                ← Entry point (single-bot & multi-bot)
+│   ├── bot.py                 ← Core single-bot logic
+│   ├── orchestrator.py        ← Multi-bot orchestrator & LLM swap engine
+│   ├── fleet_config.py        ← Fleet configuration loader & validator
+│   ├── child_bot_context.py   ← Per-bot state container (no loaded LLM)
 │   ├── config_manager.py      ← Config loader & validator
 │   ├── llm.py                 ← LLM backend (llama-cpp / transformers)
 │   ├── matrix_client.py       ← Matrix-nio wrapper
 │   ├── memory_manager.py      ← User dossier read/write/compact
 │   ├── temperature_controller.py ← Mood/temperature scheduling
 │   └── scheduler.py           ← Background async jobs
-├── tests/                     ← Unit tests
-├── setup_wizard.py            ← Interactive first-run setup
+├── tests/                     ← Unit tests (104 tests)
+├── setup_wizard.py            ← Interactive setup (single & multi-bot)
 └── requirements.txt
 ```
 
@@ -290,12 +311,149 @@ The chime-in probability also changes with each mood swing (if `randomise_chime_
 
 ---
 
+## Multi-Bot Fleet Mode
+
+Fleet mode lets you run **multiple distinct bot personalities** on a single machine with only **one LLM loaded in memory at a time**. A lightweight "route-bot" monitors all rooms and decides which child bot should respond, then swaps the LLMs atomically.
+
+### How it works
+
+```
+┌─────────────────────────────────────────────────────┐
+│                   Orchestrator                      │
+│                                                     │
+│  ┌───────────┐   PriorityQueue   ┌───────────────┐ │
+│  │ Route-bot │──(server_timestamp)──▶ Evaluation  │ │
+│  │    LLM    │   oldest-first    │    Loop       │ │
+│  └─────┬─────┘                   └───────┬───────┘ │
+│        │                                 │         │
+│        │  1. Trigger-name match?         │         │
+│        │  2. Chime-in probability?       │         │
+│        │  3. LLM classification          │         │
+│        │         ▼                       │         │
+│  ┌─────┴──────────────────┐              │         │
+│  │   LLM Swap (locked)   │◀─────────────┘         │
+│  │ unload route-bot LLM  │                         │
+│  │ load child bot LLM    │                         │
+│  │ generate response      │                         │
+│  │ unload child bot LLM  │                         │
+│  │ reload route-bot LLM  │                         │
+│  └────────────────────────┘                         │
+│                                                     │
+│  Matrix Clients: alice ─┐                           │
+│                  bob   ─┤ sync concurrently         │
+│                  ...   ─┘                           │
+└─────────────────────────────────────────────────────┘
+```
+
+**Key guarantees:**
+
+- **Only one LLM in memory at a time.** The route-bot and all child bots share a single "LLM slot" protected by an async lock.
+- **No missed messages.** Messages arriving during an LLM swap are queued and processed when the route-bot comes back online.
+- **Oldest-first processing.** A priority queue keyed on `server_timestamp` ensures FIFO ordering even when messages arrive from multiple rooms.
+- **Per-bot state.** Each child bot has its own config, persona, dossier storage, temperature controller, and Matrix account.
+
+### Three-phase routing
+
+1. **Trigger-name match** — if a message contains a bot's trigger name (e.g. "hey alice"), that bot is selected immediately. No LLM call needed.
+2. **Chime-in probability** — if no trigger matches, each eligible bot rolls its chime-in probability (influenced by its current mood/temperature).
+3. **Route-bot LLM classification** — if neither rule triggers, the route-bot LLM reads the recent transcript and bot descriptions and picks the best responder (or "none").
+
+### Setting up a fleet
+
+#### Via the setup wizard (recommended)
+
+```bash
+python setup_wizard.py
+```
+
+Choose **"Multi-bot fleet"** when prompted. The wizard will:
+
+1. Ask you to select a model for the **route-bot** (a small model is recommended — it only classifies messages, not generates chat).
+2. Walk you through configuring **child bots** one at a time — each gets a Matrix account, model, persona, trigger names, and room list.
+3. Write everything to `bots/` with this structure:
+
+```
+bots/
+├── fleet_config.yaml
+├── route_bot/
+│   └── config/
+│       └── config.yaml       ← LLM settings only (no Matrix account)
+├── alice/
+│   └── config/
+│       ├── config.yaml        ← Full config (Matrix + LLM + bot)
+│       └── bot_persona.txt
+└── bob/
+    └── config/
+        ├── config.yaml
+        └── bot_persona.txt
+```
+
+#### Adding or removing bots later
+
+```bash
+# Add a new bot to the fleet interactively:
+python setup_wizard.py --add-bot
+
+# Remove a bot by name:
+python setup_wizard.py --remove-bot bob
+```
+
+### Running the fleet
+
+```bash
+# Explicit:
+python -m src.main --multi
+
+# With a custom fleet config path:
+python -m src.main --multi path/to/fleet_config.yaml
+
+# Auto-detected (if bots/fleet_config.yaml exists):
+python -m src.main
+```
+
+### Route-bot model recommendations
+
+The route-bot only classifies messages — it doesn't need a large model. Recommended:
+
+| Model | Size | Notes |
+|---|---|---|
+| Phi-3 Mini 3.8B Q4 | ~2.2 GB | Good balance of speed and accuracy |
+| Qwen2 1.5B Q4 | ~1 GB | Very fast, decent classification |
+| TinyLlama 1.1B Q4 | ~0.7 GB | Minimal footprint, basic routing |
+
+### Fleet configuration reference
+
+`bots/fleet_config.yaml` — see [config/fleet_config.example.yaml](config/fleet_config.example.yaml) for a full annotated example.
+
+```yaml
+route_bot:
+  config_path: "bots/route_bot/config/config.yaml"
+
+bots:
+  - name: "alice"
+    config_path: "bots/alice/config/config.yaml"
+  - name: "bob"
+    config_path: "bots/bob/config/config.yaml"
+```
+
+Each child bot's `config.yaml` is a standard single-bot config. Child bots can also be run individually:
+
+```bash
+python -m src.main bots/alice/config/config.yaml
+```
+
+---
+
 ## Running the Bot
 
 ### Foreground (development)
 
 ```bash
+# Single-bot:
 python -m src.main
+
+# Multi-bot fleet:
+python -m src.main --multi
 ```
 
 ### As a background service (Linux — systemd)
@@ -318,6 +476,11 @@ RestartSec=10
 [Install]
 WantedBy=multi-user.target
 ```
+
+> **Multi-bot fleet:** Change the `ExecStart` line to:
+> ```
+> ExecStart=/path/to/matrix-local-llm-gp-bot/.venv/bin/python -m src.main --multi
+> ```
 
 Then:
 
@@ -347,6 +510,17 @@ docker run -d \
   --name matrix-bot \
   matrix-llm-bot
 ```
+
+> **Multi-bot fleet:** Mount the `bots/` directory and add `--multi`:
+> ```bash
+> docker run -d \
+>   -v $(pwd)/config:/app/config \
+>   -v $(pwd)/data:/app/data \
+>   -v $(pwd)/models:/app/models \
+>   -v $(pwd)/bots:/app/bots \
+>   --name matrix-bot \
+>   matrix-llm-bot python -m src.main --multi
+> ```
 
 ---
 
