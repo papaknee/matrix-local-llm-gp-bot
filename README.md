@@ -126,7 +126,9 @@ All models below work with the **llama-cpp** backend (GGUF format). They are qua
 |---|---|---|---|---|
 | 🟢 Tiny | [Phi-3 Mini 3.8B Q4](https://huggingface.co/microsoft/Phi-3-mini-4k-instruct-gguf) | ~2.2 GB | 4 GB | Old laptops, Raspberry Pi 5, anything with 4 GB RAM |
 | 🟡 Small *(recommended)* | [Mistral 7B Instruct Q4_K_M](https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.2-GGUF) | ~4.8 GB | 6 GB | Most modern laptops and desktops |
+| � Small | [Dolphin Mistral 7B Q4_K_M](https://huggingface.co/TheBloke/dolphin-2.6-mistral-7B-GGUF) | ~4.8 GB | 6 GB | Creative, expressive chat; great for bot personalities |
 | 🟠 Medium | [LLaMA-3 8B Instruct Q4_K_M](https://huggingface.co/bartowski/Meta-Llama-3-8B-Instruct-GGUF) | ~5.5 GB | 8 GB | Desktop with 8 GB RAM or GPU with 6 GB VRAM |
+| 🟠 Medium | [Hermes 3 LLaMA 3.1 8B Q4_K_M](https://huggingface.co/bartowski/Hermes-3-Llama-3.1-8B-GGUF) | ~5.5 GB | 8 GB | Strong reasoning and instruction following |
 | 🔴 Large | [Mistral 7B Q8_0](https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.2-GGUF) | ~7.7 GB | 10 GB | Machines with 16 GB RAM or GPU with 8 GB VRAM |
 | 🚀 Enthusiast | [Mixtral 8x7B Q4_K_M](https://huggingface.co/TheBloke/Mixtral-8x7B-Instruct-v0.1-GGUF) | ~26 GB | 32 GB | Workstation / server with lots of RAM |
 

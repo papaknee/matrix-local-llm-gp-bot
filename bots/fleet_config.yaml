@@ -1,0 +1,8 @@
+route_bot:
+  config_path: "bots/route_bot/config/config.yaml"
+
+bots:
+  - name: "baxter"
+    config_path: "bots/baxter/config/config.yaml"
+  - name: "beth"
+    config_path: "bots/beth/config/config.yaml"

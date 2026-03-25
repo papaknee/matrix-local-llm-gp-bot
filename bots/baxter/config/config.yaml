@@ -1,0 +1,56 @@
+matrix:
+  homeserver: "https://matrix.cf-hub.net"
+  username: "@baxter-bot:matrix.cf-hub.net"
+  password: "RC4M#794jsU*#F3g47Nv"
+  device_name: "baxter"
+  allowed_rooms:
+    - "!kNlyFdQwaSnAmabsDd:matrix.cf-hub.net"
+  passive_channels:
+    - "!kNlyFdQwaSnAmabsDd:matrix.cf-hub.net"
+  store_path: "bots/baxter/data/matrix_store"
+
+llm:
+  backend: "llamacpp"
+  model_path: "models/mistral-7b-instruct-v0.2.Q8_0.gguf"
+  hf_model_id: ""
+  hf_cache_dir: "models/hf_cache"
+  hardware_mode: "cpu"
+  n_gpu_layers: 0
+  context_length: 4096
+  max_new_tokens: 512
+  temperature: 0.7
+  top_p: 0.9
+  repeat_penalty: 1.1
+
+bot:
+  display_name: "baxter"
+  trigger_names:
+    - "baxter"
+    - "baxter"
+  persona_file: "bots/baxter/config/bot_persona.txt"
+  chime_in_probability: 0.25
+  chime_in_cooldown_messages: 5
+  chime_in_cooldown_seconds: 60
+  conversation_history_limit: 12
+  dossier_token_budget: 512
+  respond_on_maybe: true
+
+temperature_controller:
+  enabled: true
+  change_interval_minutes: 30
+  min_temperature: 0.3
+  max_temperature: 1.15
+  randomise_chime_in: true
+  min_chime_in: 0.02
+  max_chime_in: 0.2
+
+memory:
+  dossier_dir: "bots/baxter/data/dossiers"
+  archive_dir: "bots/baxter/data/archives"
+  max_active_entries: 50
+  compaction_interval_hours: 6
+  max_summary_chars: 800
+
+logging:
+  level: "INFO"
+  file: "bots/baxter/data/bot.log"

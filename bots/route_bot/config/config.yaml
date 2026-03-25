@@ -1,0 +1,10 @@
+llm:
+  backend: "llamacpp"
+  model_path: "models/Phi-3-mini-4k-instruct-q4.gguf"
+  hardware_mode: "cpu"
+  n_gpu_layers: 0
+  context_length: 4096
+  max_new_tokens: 128
+  temperature: 0.1
+  top_p: 0.9
+  repeat_penalty: 1.1

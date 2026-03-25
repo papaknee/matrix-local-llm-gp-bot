@@ -118,10 +118,22 @@ MODELS = {
         "filename": "mistral-7b-instruct-v0.2.Q4_K_M.gguf",
         "ram_gb": 5,
     },
+    "Small — Dolphin Mistral 7B Q4_K_M (≈ 4.8 GB VRAM / RAM) — creative, expressive": {
+        "description": "Dolphin 2.6 Mistral 7B — fine-tuned for expressive, uncensored chat.",
+        "url": "https://huggingface.co/TheBloke/dolphin-2.6-mistral-7B-GGUF/resolve/main/dolphin-2.6-mistral-7b.Q4_K_M.gguf",
+        "filename": "dolphin-2.6-mistral-7b.Q4_K_M.gguf",
+        "ram_gb": 5,
+    },
     "Medium — LLaMA-3 8B Instruct Q4_K_M (≈ 5.5 GB VRAM / RAM)": {
         "description": "Meta LLaMA-3 8B — very capable, good for GPU.",
         "url": "https://huggingface.co/bartowski/Meta-Llama-3-8B-Instruct-GGUF/resolve/main/Meta-Llama-3-8B-Instruct-Q4_K_M.gguf",
         "filename": "Meta-Llama-3-8B-Instruct-Q4_K_M.gguf",
+        "ram_gb": 6,
+    },
+    "Medium — Hermes 3 LLaMA 3.1 8B Q4_K_M (≈ 5.5 GB VRAM / RAM) — strong reasoning": {
+        "description": "NousResearch Hermes 3 Llama 3.1 8B — excellent instruction following and reasoning.",
+        "url": "https://huggingface.co/bartowski/Hermes-3-Llama-3.1-8B-GGUF/resolve/main/Hermes-3-Llama-3.1-8B-Q4_K_M.gguf",
+        "filename": "Hermes-3-Llama-3.1-8B-Q4_K_M.gguf",
         "ram_gb": 6,
     },
     "Large — Mistral 7B Instruct Q8_0 (≈ 7.7 GB VRAM / RAM) — higher quality": {
@@ -129,6 +141,12 @@ MODELS = {
         "url": "https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.2-GGUF/resolve/main/mistral-7b-instruct-v0.2.Q8_0.gguf",
         "filename": "mistral-7b-instruct-v0.2.Q8_0.gguf",
         "ram_gb": 8,
+    },
+    "Enthusiast — Mixtral 8x7B Instruct Q4_K_M (≈ 26 GB VRAM / RAM) — workstation": {
+        "description": "Mixtral 8x7B MoE — flagship open-source quality, needs 32 GB RAM.",
+        "url": "https://huggingface.co/TheBloke/Mixtral-8x7B-Instruct-v0.1-GGUF/resolve/main/mixtral-8x7b-instruct-v0.1.Q4_K_M.gguf",
+        "filename": "mixtral-8x7b-instruct-v0.1.Q4_K_M.gguf",
+        "ram_gb": 32,
     },
     "I already have a model / will download it myself": {
         "description": "Skip auto-download — you supply the path.",
@@ -218,8 +236,34 @@ def write_yaml(path: Path, data: dict) -> None:
                 lines.append(f"{prefix}{k}: \"{safe}\"")
         lines.append("")
 
+    def _write_list_section(section_name: str, lst: list, indent: int = 0):
+        lines.append(f"{'  ' * indent}{section_name}:")
+        for item in lst:
+            if isinstance(item, dict):
+                first = True
+                for k, v in item.items():
+                    prefix = "  " * (indent + 1)
+                    bullet = "- " if first else "  "
+                    first = False
+                    if isinstance(v, bool):
+                        lines.append(f"{prefix}{bullet}{k}: {'true' if v else 'false'}")
+                    elif isinstance(v, (int, float)):
+                        lines.append(f"{prefix}{bullet}{k}: {v}")
+                    elif v is None or v == "":
+                        lines.append(f"{prefix}{bullet}{k}: \"\"")
+                    else:
+                        safe = str(v).replace('"', '\\"')
+                        lines.append(f"{prefix}{bullet}{k}: \"{safe}\"")
+            else:
+                prefix = "  " * (indent + 1)
+                lines.append(f"{prefix}- \"{item}\"")
+        lines.append("")
+
     for section, content in data.items():
-        _write_section(section, content)
+        if isinstance(content, list):
+            _write_list_section(section, content)
+        else:
+            _write_section(section, content)
 
     path.write_text("\n".join(lines), encoding="utf-8")
 
